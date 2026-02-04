@@ -4,23 +4,25 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Project RT</title>
+
   <style>
     :root{
       --bg:#0f0f10;
       --text:#f3f4f6;
       --muted:rgba(243,244,246,.55);
-      --muted2:rgba(243,244,246,.35);
+      --border:rgba(255,255,255,.08);
       --red:#ef4444;
       --green:#22c55e;
       --panel:rgba(255,255,255,.03);
-      --border:rgba(255,255,255,.08);
     }
+
     html, body { height: 100%; margin: 0; }
     body{
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
       background: var(--bg);
       color: var(--text);
     }
+
     #screen{
       height: 100%;
       display: grid;
@@ -28,32 +30,37 @@
       cursor: pointer;
       user-select: none;
       transition: background-color 120ms linear;
-      background: var(--bg);
     }
 
-    /* 기본 텍스트 */
-    #text{
-      text-align:center;
-      font-size:22px;
-      letter-spacing:-0.2px;
-      opacity:.92;
-      padding:24px;
-      line-height:1.45;
+    /* 첫 화면 */
+    .hero{
+      text-align: center;
+      padding: 24px;
     }
-    .sub{
-      margin-top:12px;
-      font-size:14px;
+    .logo{
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    .tagline{
+      margin-top: 6px;
+      font-size: 14px;
+      color: var(--muted);
+      letter-spacing: .2px;
+    }
+    .hint{
+      margin-top: 18px;
+      font-size: 14px;
       color: var(--muted);
     }
 
-    /* 요약 화면 */
+    /* 요약 카드 */
     .summary{
       width: min(520px, calc(100vw - 48px));
       border: 1px solid var(--border);
       background: var(--panel);
       border-radius: 16px;
       padding: 26px 22px 18px;
-      box-sizing: border-box;
     }
     .label{
       font-size: 13px;
@@ -71,235 +78,168 @@
     .avgNum{
       font-size: 44px;
       font-weight: 750;
-      letter-spacing: -0.8px;
     }
     .avgUnit{
       font-size: 16px;
       color: var(--muted);
-      letter-spacing: .2px;
-    }
-    .chartWrap{
-      margin-top: 16px;
-      border-top: 1px solid var(--border);
-      padding-top: 16px;
     }
     canvas{
       width: 100%;
       height: 170px;
-      display:block;
+      margin-top: 14px;
     }
-    .hintRow{
-      margin-top: 10px;
+    .restart{
+      margin-top: 12px;
       font-size: 13px;
       color: var(--muted);
-      text-align:center;
-    }
-    .kbd{
-      padding: 2px 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,.04);
-      color: rgba(243,244,246,.75);
-      font-size: 12px;
-      margin-left: 6px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <div id="screen" role="button" tabindex="0">
-    <div id="text">click to start</div>
-  </div>
 
-  <script>
-    const screen = document.getElementById("screen");
-    const text = document.getElementById("text");
+<div id="screen"></div>
 
-    // idle | waiting | ready | result | summary
-    let state = "idle";
-    let timerId = null;
-    let startTime = 0;
-    let results = []; // 5개 ms
+<script>
+  const screen = document.getElementById("screen");
 
-    function randomDelay(){
-      return 1200 + Math.floor(Math.random() * 2800); // 1200~4000
-    }
+  let state = "idle"; // idle | waiting | ready | result | summary
+  let timerId = null;
+  let startTime = 0;
+  let results = [];
 
-    function set(bg, html){
-      screen.style.backgroundColor = bg;
-      text.innerHTML = html;
-    }
+  function vibrate(pattern){
+    if (navigator.vibrate) navigator.vibrate(pattern);
+  }
 
-    function resetAll(){
-      clearTimeout(timerId);
-      timerId = null;
-      results = [];
-      state = "idle";
-      set(getCSS("--bg"), "click to start");
-    }
+  function randomDelay(){
+    return 1200 + Math.floor(Math.random() * 2800);
+  }
 
-    function startRound(){
-      clearTimeout(timerId);
-      timerId = null;
+  function set(bg, html){
+    screen.style.backgroundColor = bg;
+    screen.innerHTML = html;
+  }
 
-      state = "waiting";
-      set(getCSS("--red"), "wait…");
+  function resetAll(){
+    clearTimeout(timerId);
+    results = [];
+    state = "idle";
+    set(getCSS("--bg"), `
+      <div class="hero">
+        <div class="logo">Project RT</div>
+        <div class="tagline">reaction time test</div>
+        <div class="hint">tap / click to start</div>
+      </div>
+    `);
+  }
 
-      timerId = setTimeout(() => {
-        state = "ready";
-        startTime = performance.now();
-        set(getCSS("--green"), "now");
-      }, randomDelay());
-    }
+  function startRound(){
+    clearTimeout(timerId);
+    state = "waiting";
+    set(getCSS("--red"), "wait…");
 
-    function tooSoon(){
-      clearTimeout(timerId);
-      timerId = null;
-      state = "result";
-      set(getCSS("--bg"), `too soon<div class="sub">click to retry</div>`);
-    }
+    timerId = setTimeout(() => {
+      state = "ready";
+      startTime = performance.now();
+      vibrate(25);
+      set(getCSS("--green"), "now");
+    }, randomDelay());
+  }
 
-    function showResult(ms){
-      const v = Math.round(ms);
-      results.push(v);
-      state = "result";
+  function tooSoon(){
+    clearTimeout(timerId);
+    vibrate([30, 40, 30]);
+    state = "result";
+    set(getCSS("--bg"), "too soon<br><span style='font-size:14px;color:var(--muted)'>tap to retry</span>");
+  }
 
-      if(results.length < 5){
-        set(getCSS("--bg"), `
-          <div style="font-size:40px;font-weight:750;letter-spacing:-0.6px">${v} ms</div>
-          <div class="sub">${results.length}/5 · click for next</div>
-        `);
-      } else {
-        showSummary();
-      }
-    }
+  function showResult(ms){
+    vibrate(15);
+    results.push(Math.round(ms));
+    state = "result";
 
-    function showSummary(){
-      state = "summary";
-      const avg = Math.round(results.reduce((a,b)=>a+b,0) / results.length);
-
+    if(results.length < 5){
       set(getCSS("--bg"), `
-        <div class="summary">
-          <div class="label">average</div>
-          <div class="avgRow">
-            <div class="avgNum">${avg}</div>
-            <div class="avgUnit">ms</div>
-          </div>
-
-          <div class="chartWrap">
-            <canvas id="chart"></canvas>
-          </div>
-
-          <div class="hintRow">
-            click to restart <span class="kbd">R</span> reset
-          </div>
-        </div>
+        <div style="font-size:40px;font-weight:750">${results.at(-1)} ms</div>
+        <div style="font-size:14px;color:var(--muted)">${results.length}/5 · tap for next</div>
       `);
-
-      drawChart(results);
+    } else {
+      showSummary();
     }
+  }
 
-    function drawChart(vals){
-      const canvas = document.getElementById("chart");
-      const ctx = canvas.getContext("2d");
+  function showSummary(){
+    state = "summary";
+    const avg = Math.round(results.reduce((a,b)=>a+b,0)/results.length);
 
-      // DPI 보정 (안 하면 글씨/선 뿌옇게 보임)
-      const dpr = window.devicePixelRatio || 1;
-      const cssW = canvas.clientWidth;
-      const cssH = canvas.clientHeight;
-      canvas.width = Math.round(cssW * dpr);
-      canvas.height = Math.round(cssH * dpr);
-      ctx.setTransform(dpr,0,0,dpr,0,0);
+    set(getCSS("--bg"), `
+      <div class="summary">
+        <div class="label">average</div>
+        <div class="avgRow">
+          <div class="avgNum">${avg}</div>
+          <div class="avgUnit">ms</div>
+        </div>
+        <canvas id="chart"></canvas>
+        <div class="restart">tap to restart</div>
+      </div>
+    `);
 
-      ctx.clearRect(0,0,cssW,cssH);
+    drawChart();
+  }
 
-      const padding = { l: 22, r: 14, t: 18, b: 30 };
-      const w = cssW - padding.l - padding.r;
-      const h = cssH - padding.t - padding.b;
+  function drawChart(){
+    const canvas = document.getElementById("chart");
+    const ctx = canvas.getContext("2d");
 
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const range = Math.max(40, max - min); // 너무 붙으면 보기 안 좋아서 최소 범위
-      const top = max + 20;
-      const bottom = Math.max(0, min - 20);
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
 
-      // 기준선(바닥)
-      ctx.strokeStyle = "rgba(243,244,246,.12)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(padding.l, padding.t + h + 0.5);
-      ctx.lineTo(padding.l + w, padding.t + h + 0.5);
-      ctx.stroke();
+    const max = Math.max(...results) + 30;
+    const barW = w / results.length * 0.6;
+    const gap = (w - barW * results.length) / (results.length - 1);
 
-      // 막대 계산
-      const n = vals.length; // 5
-      const gap = Math.max(10, w * 0.04);
-      const barW = (w - gap * (n - 1)) / n;
-
-      // 라벨 스타일
-      ctx.font = "12px system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR";
-      ctx.textAlign = "center";
-
-      for(let i=0;i<n;i++){
-        const v = vals[i];
-
-        // y는 위가 0이라 반대로 변환
-        const t = (v - bottom) / (top - bottom);   // 0~1
-        const barH = Math.max(6, t * h);
-
-        const x = padding.l + i * (barW + gap);
-        const y = padding.t + (h - barH);
-
-        // 그림자 살짝
-        ctx.fillStyle = "rgba(0,0,0,.35)";
-        roundRect(ctx, x, y + 2, barW, barH, 10);
-        ctx.fill();
-
-        // 본막대
-        ctx.fillStyle = getCSS("--green");
-        roundRect(ctx, x, y, barW, barH, 10);
-        ctx.fill();
-
-        // 값 텍스트 (아래)
-        ctx.fillStyle = "rgba(243,244,246,.55)";
-        ctx.fillText(String(v), x + barW/2, padding.t + h + 20);
-      }
-    }
-
-    function roundRect(ctx, x, y, w, h, r){
-      const radius = Math.min(r, w/2, h/2);
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.arcTo(x + w, y, x + w, y + h, radius);
-      ctx.arcTo(x + w, y + h, x, y + h, radius);
-      ctx.arcTo(x, y + h, x, y, radius);
-      ctx.arcTo(x, y, x + w, y, radius);
-      ctx.closePath();
-    }
-
-    function getCSS(varName){
-      return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    }
-
-    function act(){
-      if(state === "idle") return startRound();
-      if(state === "waiting") return tooSoon();
-      if(state === "ready") return showResult(performance.now() - startTime);
-      if(state === "result") return startRound();
-      if(state === "summary") return resetAll();
-    }
-
-    screen.addEventListener("click", act);
-    window.addEventListener("keydown", (e) => {
-      if(e.code === "Space" || e.code === "Enter"){
-        e.preventDefault();
-        act();
-      }
-      if(e.code === "KeyR"){
-        resetAll();
-      }
+    results.forEach((v, i) => {
+      const bh = (v / max) * (h - 20);
+      const x = i * (barW + gap);
+      const y = h - bh;
+      ctx.fillStyle = getCSS("--green");
+      roundRect(ctx, x, y, barW, bh, 10);
+      ctx.fill();
     });
+  }
 
-    resetAll();
-  </script>
+  function roundRect(ctx, x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.arcTo(x+w, y, x+w, y+h, r);
+    ctx.arcTo(x+w, y+h, x, y+h, r);
+    ctx.arcTo(x, y+h, x, y, r);
+    ctx.arcTo(x, y, x+w, y, r);
+    ctx.closePath();
+  }
+
+  function getCSS(v){
+    return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  }
+
+  function act(){
+    if(state === "idle") return startRound();
+    if(state === "waiting") return tooSoon();
+    if(state === "ready") return showResult(performance.now() - startTime);
+    if(state === "result") return startRound();
+    if(state === "summary") return resetAll();
+  }
+
+  screen.addEventListener("click", act);
+  screen.addEventListener("touchstart", act, {passive:true});
+
+  resetAll();
+</script>
+
 </body>
 </html>
